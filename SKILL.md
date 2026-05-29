@@ -1,6 +1,6 @@
 # Figma Skill
 
-Read Figma files, components, styles, variables, and projects using the `figma` CLI tool or MCP tools. Covers all Figma REST API read endpoints — files, nodes, images, versions, comments, teams, projects, components, styles, variables, and dev resources.
+Read and write Figma data using the `figma` CLI tool or MCP tools. Covers Figma REST API read endpoints — files, nodes, images, versions, comments, teams, projects, components, styles, variables, and dev resources — plus posting comments.
 
 ---
 
@@ -52,7 +52,11 @@ When you only have a Figma URL, use `figma_parse_url` (MCP) or `figma projects l
 
 ## Confirmation Protocol
 
-All tools in this skill are **read-only**. No confirmation is needed before calling any command or tool — they cannot create, modify, or delete anything.
+Most tools in this skill are **read-only** and need no confirmation. The one exception:
+
+| Tool / Command | Effect | Confirmation required |
+|---|---|---|
+| `figma_post_comment` / `files comment-add` | Creates a comment on a file | Yes — confirm message, file, and target node with the user before calling |
 
 ---
 
@@ -87,6 +91,24 @@ figma_parse_url(url)
 file_key: ABC123xyz
 node_id: 1:2
 ```
+
+---
+
+### Comments (write)
+
+#### `figma_post_comment`
+Post a comment on a Figma file. Confirm the message and file key with the user before calling.
+
+```
+figma_post_comment(file_key, message, node_id?, reply_to?)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `file_key` | string | **Required.** The Figma file key |
+| `message` | string | **Required.** The comment text |
+| `node_id` | string | Pin the comment to this node ID |
+| `reply_to` | string | Comment ID to reply to (from `figma_get_file_comments`) |
 
 ---
 
@@ -318,6 +340,12 @@ figma files versions <file_key> --limit 10 --json
 
 figma files comments <file_key>
 figma files comments <file_key> --limit 20 --json
+
+# Post a comment (write — confirm with user first)
+figma files comment-add <file_key> "Looks good to me"
+figma files comment-add <file_key> "Check this" --node 1:2
+figma files comment-add <file_key> "Agreed" --reply-to <comment_id>
+figma files comment-add <file_key> "Done" --json
 ```
 
 ### Projects

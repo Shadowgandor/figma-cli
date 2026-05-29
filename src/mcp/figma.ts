@@ -187,6 +187,31 @@ export function registerFigmaTools(server: McpServer): void {
   );
 
   server.tool(
+    "figma_post_comment",
+    "Post a comment on a Figma file. Optionally pin it to a specific node or reply to an existing comment. This is a write operation — confirm the message and file with the user before calling.",
+    {
+      file_key: z.string().describe("The Figma file key"),
+      message: z.string().describe("The comment text"),
+      node_id: z.string().optional().describe("Node ID to pin the comment to"),
+      reply_to: z.string().optional().describe("Comment ID to reply to (from figma_get_file_comments)"),
+    },
+    async ({ file_key, message, node_id, reply_to }) => {
+      try {
+        const comment = await getClient().postComment(file_key, message, { nodeId: node_id, replyTo: reply_to });
+        const lines = [
+          "Comment posted.",
+          `ID: ${comment.id}`,
+          `Message: ${comment.message}`,
+          ...(comment.parent_id ? [`Reply to: ${comment.parent_id}`] : []),
+        ];
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: formatError(err) }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     "figma_get_file_comments",
     "Get all comments on a Figma file",
     {

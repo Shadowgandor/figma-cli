@@ -100,6 +100,12 @@ export interface FigmaCommentsResponse {
   comments: FigmaComment[];
 }
 
+export interface FigmaPostCommentBody {
+  message: string;
+  client_meta?: { node_id: string; node_offset: { x: number; y: number } };
+  comment_id?: string;
+}
+
 // ── Projects ──────────────────────────────────────────────────────────
 
 export interface FigmaProject {

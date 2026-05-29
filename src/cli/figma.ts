@@ -188,6 +188,28 @@ export function registerFigmaCommands(program: Command): void {
     });
 
   files
+    .command("comment-add <file_key> <message>")
+    .description("Post a comment on a file")
+    .option("--node <node_id>", "Pin the comment to a specific node ID")
+    .option("--reply-to <comment_id>", "Reply to an existing comment")
+    .option("--json", "Output the created comment as JSON")
+    .action(async (file_key: string, message: string, opts: { node?: string; replyTo?: string; json?: boolean }) => {
+      try {
+        const comment = await getClient().postComment(file_key, message, { nodeId: opts.node, replyTo: opts.replyTo });
+        if (opts.json) {
+          console.log(JSON.stringify(comment, null, 2));
+          return;
+        }
+        console.log(chalk.green("Comment posted."));
+        console.log(`ID:      ${comment.id}`);
+        console.log(`Message: ${comment.message}`);
+        if (comment.parent_id) console.log(`Reply to: ${comment.parent_id}`);
+      } catch (err) {
+        die(err);
+      }
+    });
+
+  files
     .command("find-nodes <file_key>")
     .description("Search for nodes in a file by name or type")
     .option("--name <query>", "Case-insensitive name substring to match")

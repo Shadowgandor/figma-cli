@@ -5,8 +5,9 @@ CLI and MCP server for Figma — read files, components, styles, variables, and 
 ## Features
 
 - **CLI** (`figma`) — inspect Figma files, projects, components, styles, and variables from your terminal
-- **MCP server** (`figma-mcp`) — expose 20 read-only Figma tools to any MCP-compatible AI agent
-- Covers all Figma REST API read endpoints: files, nodes, images, versions, comments, projects, components, styles, variables, and dev resources
+- **MCP server** (`figma-mcp`) — expose 21 Figma tools to any MCP-compatible AI agent
+- Covers Figma REST API read endpoints: files, nodes, images, versions, comments, projects, components, styles, variables, and dev resources
+- Write support: post comments (optionally pinned to a node or as a reply)
 - URL parsing — extract file/team/project IDs directly from Figma URLs
 - Node search — find layers by name or type when dev resources aren't maintained
 - `--json` flag on every command for consistent scripted use
@@ -87,6 +88,12 @@ figma files versions <file_key> --limit 10 --json
 # List comments
 figma files comments <file_key>
 figma files comments <file_key> --limit 20 --json
+
+# Post a comment
+figma files comment-add <file_key> "Looks good to me"
+figma files comment-add <file_key> "Check this node" --node 1:2
+figma files comment-add <file_key> "Agreed" --reply-to <comment_id>
+figma files comment-add <file_key> "Done" --json
 ```
 
 The `file_key` is in the Figma URL: `figma.com/design/{file_key}/file-name`.
@@ -198,6 +205,7 @@ Or if running from source:
 |------|-------------|
 | `figma_auth` | Verify connection and return current user |
 | `figma_parse_url` | Extract file/team/project/node IDs from a Figma URL |
+| `figma_post_comment` | Post a comment on a file (write) |
 | `figma_get_file` | Get a file's document tree and metadata |
 | `figma_get_file_nodes` | Get specific nodes from a file by ID |
 | `figma_find_nodes` | Search nodes in a file by name or type |

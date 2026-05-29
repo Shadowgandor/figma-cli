@@ -16,10 +16,15 @@ export class FigmaClient {
     this.authHeader = config.token;
   }
 
-  async request<T>(path: string, params?: Record<string, string | number | boolean | string[]>): Promise<T> {
+  async request<T>(
+    path: string,
+    params?: Record<string, string | number | boolean | string[]>,
+    options?: { method?: "GET" | "POST"; body?: unknown },
+  ): Promise<T> {
+    const method = options?.method ?? "GET";
     let url = path.startsWith("http") ? path : `${FIGMA_API_BASE}${path}`;
 
-    if (params) {
+    if (params && method === "GET") {
       const query = new URLSearchParams();
       for (const [key, value] of Object.entries(params)) {
         if (value === undefined || value === null) continue;
@@ -37,6 +42,9 @@ export class FigmaClient {
       "X-Figma-Token": this.authHeader,
       Accept: "application/json",
     };
+    if (options?.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const controller = new AbortController();
@@ -44,7 +52,12 @@ export class FigmaClient {
 
       let response: Response;
       try {
-        response = await fetch(url, { headers, signal: controller.signal });
+        response = await fetch(url, {
+          method,
+          headers,
+          body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+          signal: controller.signal,
+        });
         clearTimeout(timer);
       } catch (err) {
         clearTimeout(timer);

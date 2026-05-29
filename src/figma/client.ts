@@ -6,7 +6,9 @@ import {
   FigmaImagesResponse,
   FigmaImageFillsResponse,
   FigmaVersionsResponse,
+  FigmaComment,
   FigmaCommentsResponse,
+  FigmaPostCommentBody,
   FigmaTeamProjectsResponse,
   FigmaProjectFilesResponse,
   FigmaFileComponentsResponse,
@@ -72,6 +74,17 @@ export class FigmaApiClient {
       `/v1/files/${fileKey}/comments`,
       opts as Record<string, string | number | boolean | string[]>,
     );
+  }
+
+  postComment(
+    fileKey: string,
+    message: string,
+    opts?: { nodeId?: string; replyTo?: string },
+  ): Promise<FigmaComment> {
+    const body: FigmaPostCommentBody = { message };
+    if (opts?.nodeId) body.client_meta = { node_id: opts.nodeId, node_offset: { x: 0, y: 0 } };
+    if (opts?.replyTo) body.comment_id = opts.replyTo;
+    return this.http.request<FigmaComment>(`/v1/files/${fileKey}/comments`, undefined, { method: "POST", body });
   }
 
   // ── Teams & Projects ────────────────────────────────────────────────
