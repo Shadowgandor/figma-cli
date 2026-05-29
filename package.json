@@ -4,6 +4,23 @@
   "description": "CLI and MCP server for Figma — read files, components, styles, and more from your terminal or AI agent.",
   "author": "GeeveeH Software",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shadowgandor/figma-cli.git"
+  },
+  "homepage": "https://github.com/Shadowgandor/figma-cli#readme",
+  "bugs": {
+    "url": "https://github.com/Shadowgandor/figma-cli/issues"
+  },
+  "keywords": [
+    "figma",
+    "cli",
+    "mcp",
+    "design",
+    "components",
+    "design-system",
+    "model-context-protocol"
+  ],
   "type": "module",
   "bin": {
     "figma": "dist/cli/index.js",
@@ -12,6 +29,7 @@
   "files": [
     "dist",
     "README.md",
+    "SKILL.md",
     "LICENSE"
   ],
   "exports": {
