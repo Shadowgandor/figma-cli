@@ -5,8 +5,11 @@ CLI and MCP server for Figma — read files, components, styles, variables, and 
 ## Features
 
 - **CLI** (`figma`) — inspect Figma files, projects, components, styles, and variables from your terminal
-- **MCP server** (`figma-mcp`) — expose 18 read-only Figma tools to any MCP-compatible AI agent
+- **MCP server** (`figma-mcp`) — expose 20 read-only Figma tools to any MCP-compatible AI agent
 - Covers all Figma REST API read endpoints: files, nodes, images, versions, comments, projects, components, styles, variables, and dev resources
+- URL parsing — extract file/team/project IDs directly from Figma URLs
+- Node search — find layers by name or type when dev resources aren't maintained
+- `--json` flag on every command for consistent scripted use
 - Token-based auth via environment variable or config file
 - Retry logic with exponential backoff and 30s timeout
 
@@ -52,6 +55,7 @@ figma auth
 
 ```bash
 figma auth
+figma auth --json
 ```
 
 ### Files
@@ -59,23 +63,30 @@ figma auth
 ```bash
 # Get file metadata and document tree
 figma files get <file_key>
-figma files get <file_key> --depth 2        # limit tree depth (recommended for large files)
+figma files get <file_key> --depth 2        # recommended for large files
 figma files get <file_key> --json           # raw JSON output
 
 # Get specific nodes by ID
 figma files nodes <file_key> 1:2 3:4
 figma files nodes <file_key> 1:2 --depth 1 --json
 
+# Search for nodes by name or type
+figma files find-nodes <file_key> --name "Button"
+figma files find-nodes <file_key> --type COMPONENT
+figma files find-nodes <file_key> --name "Header" --type FRAME --depth 3 --json
+
 # Render nodes as images (returns download URLs)
 figma files render <file_key> 1:2 3:4
 figma files render <file_key> 1:2 --format svg
-figma files render <file_key> 1:2 --format png --scale 2
+figma files render <file_key> 1:2 --format png --scale 2 --json
 
 # List version history
 figma files versions <file_key>
+figma files versions <file_key> --limit 10 --json
 
 # List comments
 figma files comments <file_key>
+figma files comments <file_key> --limit 20 --json
 ```
 
 The `file_key` is in the Figma URL: `figma.com/design/{file_key}/file-name`.
@@ -83,11 +94,14 @@ The `file_key` is in the Figma URL: `figma.com/design/{file_key}/file-name`.
 ### Projects
 
 ```bash
-# List projects in a team
+# List projects in a team — pass the team ID or a Figma team URL
 figma projects list <team_id>
+figma projects list --url "https://www.figma.com/files/team/123456789/My-Team"
+figma projects list <team_id> --json
 
 # List files in a project
 figma projects files <project_id>
+figma projects files <project_id> --json
 ```
 
 The `team_id` is in the team URL: `figma.com/files/team/{team_id}/`.
@@ -97,12 +111,14 @@ The `team_id` is in the team URL: `figma.com/files/team/{team_id}/`.
 ```bash
 # List published components in a file
 figma components list <file_key>
+figma components list <file_key> --limit 50 --json
 
 # Get a component by key
-figma components get <component_key>
+figma components get <component_key> --json
 
 # List published component sets (variant groups)
 figma components sets <file_key>
+figma components sets <file_key> --limit 20 --json
 ```
 
 ### Styles
@@ -110,9 +126,10 @@ figma components sets <file_key>
 ```bash
 # List published styles in a file
 figma styles list <file_key>
+figma styles list <file_key> --limit 50 --json
 
 # Get a style by key
-figma styles get <style_key>
+figma styles get <style_key> --json
 ```
 
 ### Variables
@@ -132,10 +149,13 @@ figma variables published <file_key> --json
 ```bash
 # List dev resources (linked code/docs) attached to a file
 figma dev-resources <file_key>
+figma dev-resources <file_key> --json
 
 # Filter to specific nodes
 figma dev-resources <file_key> --nodes 1:2,3:4
 ```
+
+> **Tip:** Dev resources require Figma Dev Mode. If none are found, use `files find-nodes` to explore the file structure instead.
 
 ## MCP Server
 
@@ -177,8 +197,10 @@ Or if running from source:
 | Tool | Description |
 |------|-------------|
 | `figma_auth` | Verify connection and return current user |
+| `figma_parse_url` | Extract file/team/project/node IDs from a Figma URL |
 | `figma_get_file` | Get a file's document tree and metadata |
 | `figma_get_file_nodes` | Get specific nodes from a file by ID |
+| `figma_find_nodes` | Search nodes in a file by name or type |
 | `figma_render_images` | Render nodes as images, return download URLs |
 | `figma_get_image_fills` | Get download URLs for image fills in a file |
 | `figma_get_file_versions` | Get version history of a file |

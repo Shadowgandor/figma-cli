@@ -6,7 +6,7 @@ Read Figma files, components, styles, variables, and projects using the `figma` 
 
 ## Skill Description (for triggering)
 
-Use this skill whenever the user wants to inspect or retrieve information from Figma. This includes reading Figma file contents or structure, listing components or styles in a design system, exploring a team's projects or files, reading variables and tokens from a library file, getting version history, reading comments, rendering node images, or finding dev resources linked to design nodes. Triggers include mentions of 'Figma', 'design file', 'component library', 'design tokens', 'Figma variables', 'Figma styles', 'design system', or a Figma URL (`figma.com/design/...`).
+Use this skill whenever the user wants to inspect or retrieve information from Figma. This includes reading Figma file contents or structure, listing components or styles in a design system, exploring a team's projects or files, reading variables and tokens from a library file, getting version history, reading comments, rendering node images, searching for nodes by name, or finding dev resources linked to design nodes. Triggers include mentions of 'Figma', 'design file', 'component library', 'design tokens', 'Figma variables', 'Figma styles', 'design system', or a Figma URL (`figma.com/design/...`).
 
 ---
 
@@ -42,9 +42,11 @@ figma_auth
 
 - **file_key** — found in the Figma URL: `figma.com/design/{file_key}/file-name`
 - **team_id** — found in the team URL: `figma.com/files/team/{team_id}/`
-- **project_id** — returned by `figma_get_team_projects` / `figma projects list <team_id>`
-- **node_id** — visible in Figma by right-clicking a layer → Copy/Paste as → Copy link (fragment after `node-id=`)
+- **project_id** — returned by `figma_get_team_projects` / `figma projects list`
+- **node_id** — visible in Figma by right-clicking a layer → Copy/Paste as → Copy link (fragment after `node-id=`); or use `figma_find_nodes` to search by name
 - **component_key / style_key** — returned by list commands (`figma_get_file_components`, `figma_get_file_styles`)
+
+When you only have a Figma URL, use `figma_parse_url` (MCP) or `figma projects list --url` (CLI) to extract the relevant IDs without having to manually parse the URL.
 
 ---
 
@@ -67,10 +69,31 @@ figma_auth()
 
 ---
 
+### URL Parsing
+
+#### `figma_parse_url`
+Extract IDs from a Figma URL. Returns `file_key`, `team_id`, `project_id`, and `node_id` when present. Use this before calling other tools when you only have a URL.
+
+```
+figma_parse_url(url)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `url` | string | **Required.** Any Figma URL |
+
+**Example output:**
+```
+file_key: ABC123xyz
+node_id: 1:2
+```
+
+---
+
 ### Files
 
 #### `figma_get_file`
-Get a file's full document tree and metadata. Use `depth` to limit tree size on large files.
+Get a file's full document tree and metadata. Always start with `depth=2` for an overview on unknown files; fetch deeper only as needed.
 
 ```
 figma_get_file(file_key, depth?, version?, ids?, branch_data?)
@@ -79,7 +102,7 @@ figma_get_file(file_key, depth?, version?, ids?, branch_data?)
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `file_key` | string | **Required.** The Figma file key |
-| `depth` | number | Node tree depth. Use `2` or `3` for large files to avoid huge responses |
+| `depth` | number | Node tree depth. Use `2` for an overview of large files |
 | `version` | string | Specific version ID (from `figma_get_file_versions`) |
 | `ids` | string[] | Limit response to these node IDs |
 | `branch_data` | boolean | Include branch metadata |
@@ -97,6 +120,22 @@ figma_get_file_nodes(file_key, ids, depth?, version?)
 | `ids` | string[] | **Required.** Node IDs to retrieve (e.g. `["1:2", "3:4"]`) |
 | `depth` | number | Tree depth per node |
 | `version` | string | Specific version ID |
+
+#### `figma_find_nodes`
+Search for nodes in a file by name or type. Use this when dev resources are unavailable or you need to locate components, frames, or text layers by name. Start with `depth=3` for large files.
+
+```
+figma_find_nodes(file_key, name?, type?, depth?)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `file_key` | string | **Required.** The Figma file key |
+| `name` | string | Case-insensitive name substring to match |
+| `type` | string | Node type filter: `FRAME`, `COMPONENT`, `TEXT`, `GROUP`, `INSTANCE`, `CANVAS`, etc. |
+| `depth` | number | Tree depth to fetch. Use `3` for large files |
+
+At least one of `name` or `type` is required.
 
 #### `figma_render_images`
 Render nodes as images and return S3 download URLs. URLs expire after a short time.
@@ -145,14 +184,14 @@ figma_get_file_comments(file_key, as_md?)
 ### Teams & Projects
 
 #### `figma_get_team_projects`
-List all projects in a Figma team. Returns project names and IDs.
+List all projects in a Figma team. Returns project names and IDs. The `team_id` is the numeric ID in `figma.com/files/team/{team_id}/` — use `figma_parse_url` to extract it from a URL.
 
 ```
 figma_get_team_projects(team_id)
 ```
 
 #### `figma_get_project_files`
-List all files in a project. Returns file names, keys, and last-modified dates.
+List all files in a project. Returns file names, keys, and last-modified dates. Use `figma_parse_url` or `figma_get_team_projects` to obtain the `project_id`.
 
 ```
 figma_get_project_files(project_id)
@@ -219,7 +258,7 @@ Get all local variables and variable collections defined in a file. Requires Dev
 figma_get_local_variables(file_key)
 ```
 
-Returns collections (with modes) and variables (with resolved type). Use `--json` / raw output to see full value-by-mode data.
+Returns collections (with modes) and variables (with resolved type).
 
 #### `figma_get_published_variables`
 Get all variables published from a library file, available for use in other files.
@@ -233,7 +272,7 @@ figma_get_published_variables(file_key)
 ### Dev Resources
 
 #### `figma_get_dev_resources`
-Get dev resources (linked code or documentation URLs) attached to a file or specific nodes.
+Get dev resources (linked code or documentation URLs) attached to a file or specific nodes. Dev resources require Figma Dev Mode to be enabled and links added manually. If none are found, use `figma_find_nodes` to explore the file structure instead.
 
 ```
 figma_get_dev_resources(file_key, node_ids?)
@@ -252,6 +291,7 @@ figma_get_dev_resources(file_key, node_ids?)
 
 ```bash
 figma auth
+figma auth --json
 ```
 
 ### Files
@@ -264,34 +304,52 @@ figma files get <file_key> --json
 figma files nodes <file_key> <id> [<id> ...]
 figma files nodes <file_key> 1:2 --depth 1 --json
 
+# Search nodes by name or type
+figma files find-nodes <file_key> --name "Button"
+figma files find-nodes <file_key> --type COMPONENT
+figma files find-nodes <file_key> --name "Header" --type FRAME --depth 3 --json
+
 figma files render <file_key> <id> [<id> ...]
 figma files render <file_key> 1:2 --format svg
-figma files render <file_key> 1:2 --format png --scale 2
+figma files render <file_key> 1:2 --format png --scale 2 --json
 
 figma files versions <file_key>
+figma files versions <file_key> --limit 10 --json
+
 figma files comments <file_key>
+figma files comments <file_key> --limit 20 --json
 ```
 
 ### Projects
 
 ```bash
+# By team ID
 figma projects list <team_id>
+
+# By URL (extracts team ID automatically)
+figma projects list --url "https://www.figma.com/files/team/123456789/My-Team"
+
+figma projects list <team_id> --json
 figma projects files <project_id>
+figma projects files <project_id> --json
 ```
 
 ### Components
 
 ```bash
 figma components list <file_key>
-figma components get <component_key>
+figma components list <file_key> --limit 50 --json
+figma components get <component_key> --json
 figma components sets <file_key>
+figma components sets <file_key> --limit 20 --json
 ```
 
 ### Styles
 
 ```bash
 figma styles list <file_key>
-figma styles get <style_key>
+figma styles list <file_key> --limit 50 --json
+figma styles get <style_key> --json
 ```
 
 ### Variables
@@ -308,6 +366,7 @@ figma variables published <file_key> --json
 
 ```bash
 figma dev-resources <file_key>
+figma dev-resources <file_key> --json
 figma dev-resources <file_key> --nodes 1:2,3:4
 ```
 
@@ -327,11 +386,14 @@ The CLI and MCP tools return clear error messages on failure:
 ## Tips
 
 - Always start with `figma_auth` to confirm the connection before other calls.
+- Use `figma_parse_url` when you only have a Figma URL — it extracts all relevant IDs in one call.
 - Use `depth: 2` or `depth: 3` with `figma_get_file` on large design files — the full document tree can be very large.
 - `figma_get_file_nodes` is more efficient than `figma_get_file` when you only need a few specific layers.
+- Use `figma_find_nodes` to locate components or frames by name when you don't have node IDs or dev resources.
+- `figma_get_team_projects` → `figma_get_project_files` is the discovery path when you have a team ID but not a file key.
 - Use `figma_get_file_components` to discover component keys, then `figma_get_component` for details.
 - Use `figma_get_file_styles` to discover style keys, then `figma_get_style` for details.
 - Variables require Dev Mode or editor-level access on the file — `figma_get_published_variables` works for consumers of a library file.
 - `figma_render_images` returns temporary S3 URLs; download or display them promptly.
-- Use `--json` on CLI commands to get raw API output for programmatic processing.
-- `figma_get_team_projects` → `figma_get_project_files` is the discovery path when you have a team ID but not a file key.
+- Use `--json` on any CLI command for raw output suitable for scripting or piping to `jq`.
+- Use `--limit` on list commands (versions, comments, components, sets, styles) to cap output on large files.
