@@ -1,6 +1,6 @@
 {
   "name": "@geeveeh/figma-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI and MCP server for Figma — read files, components, styles, and more from your terminal or AI agent.",
   "author": "GeeveeH Software",
   "license": "MIT",
