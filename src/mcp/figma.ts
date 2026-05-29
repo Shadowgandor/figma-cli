@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { loadConfigFromEnv, FigmaClient } from "../core/index.js";
-import { FigmaApiClient } from "../figma/index.js";
+import { loadConfigFromEnv, FigmaClient, parseFigmaUrl } from "../core/index.js";
+import { FigmaApiClient, findNodes } from "../figma/index.js";
 import { formatError } from "./helpers.js";
 
 let _client: FigmaApiClient | null = null;
@@ -33,14 +33,44 @@ export function registerFigmaTools(server: McpServer): void {
     },
   );
 
+  // ── URL Parsing ───────────────────────────────────────────────────
+
+  server.tool(
+    "figma_parse_url",
+    "Extract IDs from a Figma URL. Returns file_key, team_id, project_id, and node_id when present. Use this before calling other tools when you only have a URL.",
+    {
+      url: z.string().describe(
+        "A Figma URL, e.g. https://www.figma.com/design/{file_key}/..., https://www.figma.com/files/team/{team_id}/..., or https://www.figma.com/files/project/{project_id}/...",
+      ),
+    },
+    async ({ url }) => {
+      const parts = parseFigmaUrl(url);
+      if (!parts.fileKey && !parts.teamId && !parts.projectId) {
+        return {
+          content: [{
+            type: "text",
+            text: `Could not extract any IDs from: ${url}\nExpected patterns:\n- figma.com/design/{file_key}/...\n- figma.com/files/team/{team_id}/...\n- figma.com/files/project/{project_id}/...`,
+          }],
+          isError: true,
+        };
+      }
+      const lines: string[] = [];
+      if (parts.fileKey) lines.push(`file_key: ${parts.fileKey}`);
+      if (parts.teamId) lines.push(`team_id: ${parts.teamId}`);
+      if (parts.projectId) lines.push(`project_id: ${parts.projectId}`);
+      if (parts.nodeId) lines.push(`node_id: ${parts.nodeId}`);
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    },
+  );
+
   // ── Files ─────────────────────────────────────────────────────────
 
   server.tool(
     "figma_get_file",
-    "Get a Figma file's document tree and metadata by its file key (the key is in the URL: figma.com/design/{file_key}/...)",
+    "Get a Figma file's document tree and metadata by its file key (the key is in the URL: figma.com/design/{file_key}/...). Always pass depth=2 first to get an overview, then fetch deeper as needed.",
     {
       file_key: z.string().describe("The Figma file key"),
-      depth: z.number().optional().describe("Node tree depth to return (default: full tree — use a small number like 2 for large files)"),
+      depth: z.number().optional().describe("Node tree depth to return — use 2 for an overview, omit only for small files"),
       version: z.string().optional().describe("Specific version ID to retrieve"),
       ids: z.array(z.string()).optional().describe("Specific node IDs to include (limits the response)"),
       branch_data: z.boolean().optional().describe("Include branch metadata in the response"),
@@ -185,8 +215,8 @@ export function registerFigmaTools(server: McpServer): void {
 
   server.tool(
     "figma_get_team_projects",
-    "List all projects in a Figma team",
-    { team_id: z.string().describe("The Figma team ID (found in the team URL: figma.com/files/team/{team_id}/...)") },
+    "List all projects in a Figma team. The team_id is the numeric ID in the team URL: figma.com/files/team/{team_id}/... — use figma_parse_url to extract it from a URL.",
+    { team_id: z.string().describe("The Figma team ID (numeric, found in figma.com/files/team/{team_id}/...)") },
     async ({ team_id }) => {
       try {
         const result = await getClient().getTeamProjects(team_id);
@@ -207,7 +237,7 @@ export function registerFigmaTools(server: McpServer): void {
   server.tool(
     "figma_get_project_files",
     "List all files in a Figma project",
-    { project_id: z.string().describe("The Figma project ID (from figma_get_team_projects)") },
+    { project_id: z.string().describe("The Figma project ID (from figma_get_team_projects or figma_parse_url)") },
     async ({ project_id }) => {
       try {
         const result = await getClient().getProjectFiles(project_id);
@@ -435,7 +465,7 @@ export function registerFigmaTools(server: McpServer): void {
 
   server.tool(
     "figma_get_dev_resources",
-    "Get dev resources (linked code/docs URLs) attached to a Figma file or specific nodes",
+    "Get dev resources (linked code/docs URLs) attached to a Figma file or specific nodes. Dev resources require Figma Dev Mode; if none are found, use figma_find_nodes to locate components by name instead.",
     {
       file_key: z.string().describe("The Figma file key"),
       node_ids: z.array(z.string()).optional().describe("Filter to specific node IDs"),
@@ -445,11 +475,50 @@ export function registerFigmaTools(server: McpServer): void {
         const result = await getClient().getFileDevResources(file_key, node_ids);
         const resources = result.dev_resources ?? [];
         if (!resources.length) {
-          return { content: [{ type: "text", text: "No dev resources found." }] };
+          return {
+            content: [{
+              type: "text",
+              text: "No dev resources found. Dev resources require Figma Dev Mode to be enabled and links added manually. Use figma_find_nodes to explore the file structure by name instead.",
+            }],
+          };
         }
         const text = resources.map((r) =>
           `${r.name}\n  URL: ${r.url}\n  Node: ${r.node_id} (id: ${r.id})`,
         ).join("\n\n");
+        return { content: [{ type: "text", text }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: formatError(err) }], isError: true };
+      }
+    },
+  );
+
+  // ── Node Search ───────────────────────────────────────────────────
+
+  server.tool(
+    "figma_find_nodes",
+    "Search for nodes in a Figma file by name or type. Use this when dev resources are unavailable to locate components, frames, or text layers. Start with depth=3 for large files.",
+    {
+      file_key: z.string().describe("The Figma file key"),
+      name: z.string().optional().describe("Case-insensitive name substring to match"),
+      type: z.string().optional().describe("Node type to filter (e.g. FRAME, COMPONENT, TEXT, GROUP, INSTANCE, CANVAS)"),
+      depth: z.number().optional().describe("Tree depth to fetch — use 3 for large files, omit for small files"),
+    },
+    async ({ file_key, name, type, depth }) => {
+      try {
+        if (!name && !type) {
+          return { content: [{ type: "text", text: "Provide at least one of: name, type" }], isError: true };
+        }
+        const file = await getClient().getFile(file_key, { depth });
+        const matches = findNodes(file.document, name, type);
+        if (!matches.length) {
+          return { content: [{ type: "text", text: "No matching nodes found." }] };
+        }
+        const text = [
+          `${matches.length} match(es):`,
+          ...matches.map((m) =>
+            `${m.type}: ${m.name} (id: ${m.id}${m.childCount > 0 ? `, ${m.childCount} children` : ""})`,
+          ),
+        ].join("\n");
         return { content: [{ type: "text", text }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatError(err) }], isError: true };
