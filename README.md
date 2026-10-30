@@ -302,6 +302,23 @@ Or if running from source:
 | `figma_get_published_variables` | Get published variables from a library file |
 | `figma_get_dev_resources` | Get dev resources attached to a file |
 
+## Agent Skills
+
+Two Agent Skills teach an AI agent how to use this package. Install the one that matches how your agent reaches Figma, not both:
+
+| Skill | For agents that… | Covers |
+|---|---|---|
+| [`skills/figma-cli`](skills/figma-cli/SKILL.md) | run shell commands with the `figma` CLI installed | Every `figma` command, including `figma mcp` |
+| [`skills/figma-mcp`](skills/figma-mcp/SKILL.md) | have the `figma-mcp` server connected | The `figma_*` MCP tools |
+
+Install a skill by copying its folder into your agent's skills directory, e.g. for Claude Code:
+
+```bash
+cp -r skills/figma-cli ~/.claude/skills/
+# or, from the installed npm package:
+cp -r "$(npm root -g)/@geeveeh/figma-cli/skills/figma-cli" ~/.claude/skills/
+```
+
 ## Development
 
 ```bash
