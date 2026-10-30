@@ -1,3 +1,4 @@
+import { createRequire } from "module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
@@ -6,7 +7,10 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { FileOAuthProvider, explainAuthError } from "./oauth.js";
 import { DESKTOP_URL, type ServerTarget } from "./servers.js";
 
-const CLIENT_INFO = { name: "figma-cli", version: "0.3.0" };
+const require = createRequire(import.meta.url);
+const { version } = require("../../package.json") as { version: string };
+
+const CLIENT_INFO = { name: "figma-cli", version };
 
 function isConnectionRefused(err: unknown): boolean {
   const cause = (err as { cause?: { code?: string } })?.cause;
