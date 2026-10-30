@@ -1,4 +1,5 @@
-export { FigmaConfig, FigmaApiError } from "./types.js";
+export { FigmaApiError } from "./types.js";
+export type { FigmaConfig } from "./types.js";
 export { loadConfigFromEnv } from "./auth.js";
 export { FigmaClient } from "./client.js";
 export { parseFigmaUrl } from "./url.js";
