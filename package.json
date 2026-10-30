@@ -1,7 +1,7 @@
 {
   "name": "@geeveeh/figma-cli",
   "version": "0.3.0",
-  "description": "CLI and MCP server for Figma — read files, components, styles, and more from your terminal or AI agent.",
+  "description": "CLI and MCP server for Figma — read files, components, styles, and more from your terminal or AI agent, and call Figma's official MCP server from the command line.",
   "author": "GeeveeH Software",
   "license": "MIT",
   "repository": {
@@ -19,6 +19,8 @@
     "design",
     "components",
     "design-system",
+    "dev-mode",
+    "code-connect",
     "model-context-protocol"
   ],
   "type": "module",

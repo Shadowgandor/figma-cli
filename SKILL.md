@@ -1,18 +1,18 @@
 # Figma Skill
 
-Read and write Figma data using the `figma` CLI tool or MCP tools. Covers Figma REST API read endpoints — files, nodes, images, versions, comments, teams, projects, components, styles, variables, and dev resources — plus posting comments.
+Read and write Figma data using the `figma` CLI tool or MCP tools. Covers Figma REST API read endpoints — files, nodes, images, versions, comments, teams, projects, components, styles, variables, and dev resources — plus posting comments. `figma mcp` also exposes every tool of Figma's official MCP server (design context/code generation, screenshots, variable definitions, Code Connect, canvas writes).
 
 ---
 
 ## Skill Description (for triggering)
 
-Use this skill whenever the user wants to inspect or retrieve information from Figma. This includes reading Figma file contents or structure, listing components or styles in a design system, exploring a team's projects or files, reading variables and tokens from a library file, getting version history, reading comments, rendering node images, searching for nodes by name, or finding dev resources linked to design nodes. Triggers include mentions of 'Figma', 'design file', 'component library', 'design tokens', 'Figma variables', 'Figma styles', 'design system', or a Figma URL (`figma.com/design/...`).
+Use this skill whenever the user wants to inspect or retrieve information from Figma. This includes reading Figma file contents or structure, listing components or styles in a design system, exploring a team's projects or files, reading variables and tokens from a library file, getting version history, reading comments, rendering node images, searching for nodes by name, or finding dev resources linked to design nodes. Also use it to call Figma's official MCP server tools through `figma mcp`: generating code from a design (design context), screenshots of nodes, variable definitions, Code Connect, and writing to the canvas. Triggers include mentions of 'Figma', 'design file', 'component library', 'design tokens', 'Figma variables', 'Figma styles', 'design system', or a Figma URL (`figma.com/design/...`).
 
 ---
 
 ## Prerequisites
 
-The `figma` CLI must be installed and `FIGMA_TOKEN` must be set:
+The `figma` CLI must be installed. The REST commands and `figma_*` MCP tools need `FIGMA_TOKEN`:
 
 ```bash
 export FIGMA_TOKEN="your-personal-access-token"
@@ -36,6 +36,12 @@ figma auth
 figma_auth
 ```
 
+`figma mcp` commands don't use `FIGMA_TOKEN`. They need the Figma desktop app running with its MCP server enabled (default), or a logged-in remote server. Check with:
+
+```bash
+figma mcp status
+```
+
 ---
 
 ## Key Identifiers
@@ -57,6 +63,7 @@ Most tools in this skill are **read-only** and need no confirmation. The one exc
 | Tool / Command | Effect | Confirmation required |
 |---|---|---|
 | `figma_post_comment` / `files comment-add` | Creates a comment on a file | Yes — confirm message, file, and target node with the user before calling |
+| `figma mcp <write tool>` (e.g. `use_figma`, `generate_figma_design`, `create_new_file`, `upload_assets`, Code Connect mapping, `weave_run_*`) | Modifies Figma content or spends credits | Yes — describe what will change and get approval first |
 
 ---
 
@@ -400,6 +407,30 @@ figma dev-resources <file_key> --nodes 1:2,3:4
 
 ---
 
+### Official Figma MCP server (`figma mcp`)
+
+`figma mcp` wraps Figma's own MCP server: design-to-code context, screenshots, variable definitions, Code Connect, and the write tools. Use it when you need generated code or screenshots for a node. Use the REST-based commands above for file trees, components, styles, comments, and projects.
+
+Requires the Figma desktop app running with its MCP server enabled (Dev Mode → enable MCP server), or `--server remote` after `figma mcp login`. Figma currently refuses figma-cli on the remote server (HTTP 403, client allowlist), so expect to use the desktop server.
+
+```bash
+figma mcp status                                   # check the connection
+figma mcp tools                                    # what this server offers
+figma mcp <tool> --help                            # options for one tool
+figma mcp get_design_context "<figma url with node-id>"
+figma mcp get_screenshot --node-id 1:2             # prints the saved image path
+figma mcp get_variable_defs --node-id 1:2 --json
+figma mcp get_metadata --node-id 0:1
+figma mcp prompt create_design_system_rules
+```
+
+- Always run `figma mcp tools` or `figma mcp <tool> --help` first. The tool set comes from the server and changes over time.
+- Pass a Figma URL as a bare argument to fill `fileKey`/`nodeId`. The desktop server can also use the current selection in Figma when `nodeId` is omitted.
+- Images are written to disk and only their path is printed. Read the file if you need to see it.
+- Tools that create or modify content (`use_figma`, `generate_figma_design`, `create_new_file`, `upload_assets`, `add_code_connect_map`, `send_code_connect_mappings`, `create_*`/`update_*`, `weave_run_*`) change the user's Figma files or spend credits. **Confirm with the user before calling them.**
+
+---
+
 ## Error Handling
 
 The CLI and MCP tools return clear error messages on failure:
@@ -408,6 +439,14 @@ The CLI and MCP tools return clear error messages on failure:
 - **403** — Insufficient permissions. The token owner may not have access to this file or team.
 - **404** — File, component, style, or resource not found. Confirm the key or ID with the user.
 - **429** — Rate limited. The client retries automatically with backoff (up to 3 attempts).
+
+`figma mcp` errors:
+
+- **"Could not reach the Figma desktop MCP server"** — Ask the user to open the Figma desktop app and a Design file, switch to Dev Mode, and enable the MCP server.
+- **"refused figma-cli (HTTP 403 Forbidden)"** — Figma's remote server only admits allowlisted clients. Use the desktop server; don't retry.
+- **"Not logged in to …"** — The user needs to run `figma mcp login` (it opens a browser, so the user must do it).
+- **"Unknown option" / "Missing required option(s)"** — Run `figma mcp <tool> --help` and fix the arguments.
+- A non-zero exit with the tool's own message means the Figma server reported the error. Read the message before retrying.
 
 ---
 
@@ -425,3 +464,6 @@ The CLI and MCP tools return clear error messages on failure:
 - `figma_render_images` returns temporary S3 URLs; download or display them promptly.
 - Use `--json` on any CLI command for raw output suitable for scripting or piping to `jq`.
 - Use `--limit` on list commands (versions, comments, components, sets, styles) to cap output on large files.
+- Prefer `figma mcp get_design_context` over walking `figma files nodes` output when the goal is implementing a design in code.
+- `figma mcp get_metadata` gives a light outline of node IDs, names and sizes. Use it to find the right `nodeId` before asking for design context on a large frame.
+- With `figma mcp`, pass the Figma URL the user gave you as a bare argument instead of extracting IDs yourself.
